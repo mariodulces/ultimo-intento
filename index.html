@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Ruta Calahorra con Ruta en Mapa</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <style>
+    html, body, #map { height: 100%; margin: 0; padding: 0; }
+    #info {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: white;
+      padding: 10px;
+      z-index: 1000;
+      font-family: Arial, sans-serif;
+      max-width: 300px;
+      box-shadow: 0 0 8px rgba(0,0,0,0.3);
+    }
+  </style>
+</head>
+<body>
+
+<div id="info">Cargando rutas...</div>
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script>
+  const apiKey = '5b3ce3597851110001cf62481a56d5e8e2fb4b2598a7e4b05c311549';
+
+  const catedral = [-1.9577569236175345, 42.298974053521775];
+  const elRaso = [-1.961359105630802, 42.301664710448975];
+
+  const map = L.map('map').setView([42.3003, -1.9595], 16);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors'
+  }).addTo(map);
+
+  L.marker([42.298974053521775, -1.9577569236175345]).addTo(map).bindPopup("Catedral de Santa María");
+  L.marker([42.301664710448975, -1.961359105630802]).addTo(map).bindPopup("El Raso");
+
+  const infoDiv = document.getElementById('info');
+
+  async function dibujarRuta(tipo, color) {
+    infoDiv.textContent = `Cargando ruta ${tipo}...`;
+    try {
+      const res = await fetch(`https://api.openrouteservice.org/v2/directions/${tipo}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': apiKey,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          coordinates: [catedral, elRaso]
+        })
+      });
+      if (!res.ok) {
+        const errorData = await res.json();
+        infoDiv.textContent = `Error: ${errorData.error || 'No se pudo obtener la ruta'}`;
+        return;
+      }
+      const data = await res.json();
+      const coords = data.features[0].geometry.coordinates.map(p => [p[1], p[0]]);
+      const distancia = data.features[0].properties.summary.distance / 1000;
+      const duracion = data.features[0].properties.summary.duration / 60;
+
+      L.polyline(coords, { color, weight: 5 }).addTo(map);
+
+      infoDiv.innerHTML += `<br>Ruta ${tipo}: ${distancia.toFixed(2)} km, ${duracion.toFixed(1)} min`;
+    } catch (e) {
+      infoDiv.textContent = `Error en la conexión: ${e.message}`;
+    }
+  }
+
+  dibujarRuta('foot-walking', 'green');
+  dibujarRuta('cycling-regular', 'blue');
+
+</script>
+</body>
+</html>
